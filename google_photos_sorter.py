@@ -245,7 +245,8 @@ class GooglePhotosSorter:
             logger.exception(f"Something went wrong when trying to get JSON data for the file -> {folder}/{file}")
             return None
         
-    def _restore_metadata(self, file_path: Path, metadata: dict) -> bool:
+    @staticmethod
+    def _restore_metadata(file_path: Path, metadata: dict) -> bool:
         metadata_restorer = MetadataRestorer(
             file_path=file_path,
             metadata=metadata
