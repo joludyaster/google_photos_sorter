@@ -1,12 +1,10 @@
-import os
 import shutil
 import json
-import time
 import logging
-import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+from metadata_restorer import MetadataRestorer
 
 logger = logging.getLogger(__name__)
 
@@ -43,23 +41,47 @@ class GooglePhotosSorter:
         self.additional_file_move = additional_file_move
 
         self.photo_formats = [
-            "jpeg", 
-            "jpg", 
-            "gif", 
-            "tiff", 
-            "raw", 
-            "png"
+            "jpg",
+            "jpeg",
+            "png",
+            "gif",
+            "webp",
+            "heic",
+            "heif",
+            "bmp",
+            "tiff",
+            "tif",
+            "raw",
+            "arw",   # Sony
+            "cr2",   # Canon
+            "cr3",   # Canon (newer)
+            "dng",   # Adobe / Google Pixel
+            "nef",   # Nikon
+            "nrw",   # Nikon (compact)
+            "orf",   # Olympus
+            "raf",   # Fujifilm
+            "rw2",   # Panasonic
+            "srw",   # Samsung
+            "x3f",   # Sigma
+            "pef",   # Pentax
         ]
+        
         self.video_formats = [
-            "mp4", 
-            "mov", 
-            "avi", 
-            "wmv", 
-            "avchd", 
-            "webm", 
-            "flv", 
-            "mkv", 
-            "mpeg-4"
+            "mp4",
+            "m4v",
+            "mov",
+            "avi",
+            "wmv",
+            "flv",
+            "webm",
+            "mkv",
+            "3gp",
+            "3g2",
+            "m2ts",
+            "mts",
+            "mpg",
+            "mpeg",
+            "ogv",
         ]
 
         self.photo_folder_format = "photos"
@@ -113,7 +135,8 @@ class GooglePhotosSorter:
 
                 self._move_file(
                     folder=Path(folder),
-                    file=file
+                    file=file,
+                    metadata=get_metadata
                 )
                 
             logger.info(f"Finished transporting files in folder: {self.origin_folder}")
@@ -143,6 +166,7 @@ class GooglePhotosSorter:
         Optional[str]
             JSON metadata or None
         """
+        
         supplemental_metadata = "supplemental-metadata"
         split_file = file.rsplit(".", 1)
         path_to_file = f"{folder}/{file}"
@@ -179,6 +203,7 @@ class GooglePhotosSorter:
         str
             Folder format [videos, photos or files]
         """
+        
         if extension[-1].lower() in self.photo_formats:
             return self.photo_folder_format
         elif extension[-1].lower() in self.video_formats:
@@ -219,8 +244,16 @@ class GooglePhotosSorter:
         except Exception:
             logger.exception(f"Something went wrong when trying to get JSON data for the file -> {folder}/{file}")
             return None
+        
+    def _restore_metadata(self, file_path: Path, metadata: dict) -> bool:
+        metadata_restorer = MetadataRestorer(
+            file_path=file_path,
+            metadata=metadata
+        )
+        result = metadata_restorer.restore_metadata()
+        return result
 
-    def _move_file(self, folder: Path, file: str) -> None:
+    def _move_file(self, folder: Path, file: str, metadata: dict) -> None:
         """
         Function to move the file
 
@@ -230,6 +263,8 @@ class GooglePhotosSorter:
             Folder in which the file will be located
         file : str
             File to move
+        metadata : dict
+            Metadata of the file
         """
 
         try:
@@ -239,97 +274,26 @@ class GooglePhotosSorter:
             if file_path.exists():
                 logger.warning(f"The path {folder}/{file} already exists, skipping...")
                 return
+            
+            restore_metadata = self._restore_metadata(
+                file_path=Path(self.origin_folder / file),
+                metadata=metadata
+            )
+            
+            if not restore_metadata:
+                logger.error(f"Couldn't restore metadata for the file: {file_path}")
                 
             if self.additional_file_move:
                 Path(self.destination_folder / "all-files").mkdir(parents=True, exist_ok=True)
-                shutil.copy(
+                shutil.copy2(
                     src=f"{self.origin_folder}/{file}",
                     dst=Path(self.destination_folder) / "all-files"
                 )
             
-            shutil.copy(
+            shutil.copy2(
                 src=f"{self.origin_folder}/{file}",
                 dst=folder
             )
         except Exception:
             logger.exception(f"Something went wrong while transporting {file} to -> {folder}")
             return
-
-def setup_logging() -> None:
-    """
-    Function to set up logging.
-    """
-    error_handler = logging.FileHandler("errors.log", mode="w")
-    error_handler.setLevel(logging.ERROR)
-    
-    warning_handler = logging.FileHandler("logs.log", mode="w")
-    warning_handler.setLevel(logging.WARNING)
-    
-    info_handler = logging.FileHandler("logs.log", mode="w")
-    info_handler.setLevel(logging.INFO)
-    
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format="%(asctime)s - %(levelname)s - %(message)s",
-        handlers=[
-            error_handler,
-            warning_handler,
-            info_handler,
-            logging.StreamHandler(sys.stdout)
-        ]
-    )
-
-def main():
-    setup_logging()
-
-    destination_folder = Path.cwd()
-
-    owner = "user"
-    
-    # Set this if you would like to additionally move all of 
-    # your files in one folder without sorting (adds extra space)
-    additional_file_move = False
-
-    input_path = str(input("Enter the path of your Google Photos: ")).replace("\\", "/")
-
-    try:
-        logger.info(f"Starting to process files in folder -> {input_path}")
-        if Path(input_path).exists():
-
-            old_time = time.time()
-
-            for subdir, dirs, files in os.walk(input_path):
-                logger.info(f"Processing folder -> {subdir}")
-                logger.info(f"Starting to transport files...")
-                
-
-                thread = GooglePhotosSorter(
-                    origin_folder=Path(subdir),
-                    destination_folder=Path(destination_folder),
-                    owner=owner,
-                    files=files,
-                    additional_file_move=additional_file_move
-                )
-                thread.file_mover()
-                logger.info(f"Finished working with {subdir}")
-
-            time_difference = time.time() - old_time
-
-            text = f"""
-Program finished transporting all of the files.
-
-Program finished it's job in {time_difference}"""
-
-            logger.info(text)
-            return
-
-        logger.error(f"The path you provided doesn't exist.")
-        return
-
-    except Exception:
-        logger.exception(f"Something went wrong while processing {input_path}")
-        return
-
-
-if __name__ == "__main__":
-    main()
