@@ -1,5 +1,6 @@
 import exiftool
 import logging
+import os
 from datetime import datetime, UTC
 from typing import Optional
 from pathlib import Path
@@ -149,7 +150,23 @@ class MetadataRestorer:
             "geo_data_exif": self.metadata.get("geoDataExif"),
         }
         
-    def _generate_photo_metadata(self, fields: dict):
+    def _set_file_dates(self, filepath: str, timestamp: int) -> None:
+        """
+        Function to set system-wise modification date of the file, 
+        by doing that, other cloud storages such as Proton Photos, Synology Photos, Nextcloud Photos etc.
+        can safely upload the file and sort it in a chronological order
+
+        Parameters
+        ----------
+        filepath : str
+            Path to the file
+        timestamp : int
+            Timestamp of the file from the metadata
+        """
+        
+        return os.utime(filepath, (timestamp, timestamp))
+        
+    def _generate_photo_metadata(self, fields: dict) -> dict:
         """
         Function to generate photo metadata
 
@@ -160,7 +177,7 @@ class MetadataRestorer:
 
 		Returns
 		-------
-		_type_
+		dict
 			Metadata of the photo
 		"""
   
@@ -187,7 +204,7 @@ class MetadataRestorer:
 
         return metadata
     
-    def _generate_video_metadata(self, fields: dict):
+    def _generate_video_metadata(self, fields: dict) -> dict:
         """
         Function to generate video metadata
 
@@ -197,7 +214,7 @@ class MetadataRestorer:
 			Common fields that were extracted from _extract_common_fields() function
 		Returns
 		-------
-		_type_
+		dict
 			Metadata of the video
 		"""
   
@@ -205,19 +222,13 @@ class MetadataRestorer:
 
         if fields["photo_taken_time"]:
             date_str = self._format_date(int(fields["photo_taken_time"]))
-            metadata["QuickTime:CreateDate"] = date_str 
-            metadata["QuickTime:TrackCreateDate"] = date_str
-            metadata["QuickTime:MediaCreateDate"] = date_str
-            
-            metadata["QuickTime:ModifyDate"] = date_str
-            metadata["QuickTime:TrackModifyDate"] = date_str
-            metadata["QuickTime:MediaModifyDate"] = date_str
-            
+            metadata["AllDates"] = date_str
+            metadata["XMP:DateTimeOriginal"] = date_str
+
         if fields["modification_time"]:
             mod_str = self._format_date(int(fields["modification_time"]))
-            metadata["QuickTime:ModifyDate"] = mod_str
-            metadata["QuickTime:TrackModifyDate"] = mod_str
-            metadata["QuickTime:MediaModifyDate"] = mod_str
+            metadata["ModifyDate"] = mod_str
+            metadata["XMP:ModifyDate"] = mod_str
 
         if fields["description"]:
             metadata["QuickTime:Description"] = fields["description"]
@@ -268,24 +279,30 @@ class MetadataRestorer:
             if not generate_metadata:
                 return False
             
+            common_fields = self._extract_common_fields()
+            
             try:
                 et.set_tags(
-					files=self.file_path,
-					tags=generate_metadata,
-					params=["-P", "-overwrite_original", "-n", "-charset", "UTF8"]
-				)
+                    files=self.file_path,
+                    tags=generate_metadata,
+                    params=["-P", "-overwrite_original", "-n", "-charset", "UTF8"]
+                )
                 logger.info(f"Successfully restored metadata for: {self.file_path}")
+                if common_fields["photo_taken_time"]:
+                    self._set_file_dates(str(self.file_path), int(common_fields["photo_taken_time"]))
                 return True
             except exiftool.exceptions.ExifToolExecuteError as e:
                 if "minor" in et.last_stderr.lower():
                     logger.warning(f"Minor error in file {self.file_path}, retrying with -ignoreMinorErrors")
                     try:
                         et.set_tags(
-							files=self.file_path,
-							tags=generate_metadata,
-							params=["-P", "-overwrite_original", "-n", "-charset", "UTF8", "-ignoreMinorErrors"]
-						)
+                            files=self.file_path,
+                            tags=generate_metadata,
+                            params=["-P", "-overwrite_original", "-n", "-charset", "UTF8", "-ignoreMinorErrors"]
+                        )
                         logger.info(f"Successfully restored metadata for: {self.file_path}")
+                        if common_fields["photo_taken_time"]:
+                            self._set_file_dates(str(self.file_path), int(common_fields["photo_taken_time"]))
                         return True
                     except exiftool.exceptions.ExifToolExecuteError:
                         logger.exception(f"Failed even with -ignoreMinorErrors for {self.file_path}")
