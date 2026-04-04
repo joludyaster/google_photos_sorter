@@ -107,6 +107,9 @@ class GooglePhotosSorter:
 
                 if not get_metadata:
                     logger.error(f"JSON data was not found for the file -> {self.origin_folder}/{file}")
+                    self._move_failed_file(
+                        file_path=self.origin_folder / file
+                    )
                     continue
                 
                 if not type(get_metadata) is dict:
@@ -253,6 +256,33 @@ class GooglePhotosSorter:
         )
         result = metadata_restorer.restore_metadata()
         return result
+    
+    def _move_failed_file(self, file_path: Path) -> bool:
+        """
+        Function to move a file for which JSON metadata wasn't found, purely for convenience
+
+        Parameters
+        ----------
+        file_path : Path
+            Path to the file that has to be moved
+            
+        Returns
+		-------
+		bool
+			True if file was moved successfully, False otherwise
+        """
+        
+        try:
+            failed_files_path = self.destination_folder / "failed-files"
+            Path(failed_files_path).mkdir(parents=True, exist_ok=True)
+            shutil.copy2(
+                src=file_path,
+                dst=failed_files_path
+            )
+            return True
+        except Exception:
+            logger.exception(f"Failed when copying a failed {file_path} to {failed_files_path}")
+            return False
 
     def _move_file(self, folder: Path, file: str, metadata: dict) -> None:
         """
