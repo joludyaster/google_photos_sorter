@@ -1,14 +1,16 @@
-import exiftool
 import logging
 import os
+import exiftool
+
 from datetime import datetime, UTC
-from typing import Optional
 from pathlib import Path
+from typing import Optional
+
 
 logger = logging.getLogger(__name__)
 
 
-class MetadataRestorer:
+class Metadata:
 
     def __init__(self, file_path: Path, metadata: dict):
         """
@@ -129,7 +131,7 @@ class MetadataRestorer:
             Formatted date
         """
 
-        return datetime.fromtimestamp(timestamp=timestamp, tz=UTC).strftime("%Y:%m:%d %H:%M:%S")
+        return datetime.fromtimestamp(timestamp, tz=UTC).strftime("%Y:%m:%d %H:%M:%S")
 
     def _extract_common_fields(self) -> dict:
         """
@@ -150,11 +152,11 @@ class MetadataRestorer:
             "geo_data": self.metadata.get("geoData"),
             "geo_data_exif": self.metadata.get("geoDataExif"),
         }
-    
+
     @staticmethod
     def _set_file_dates(filepath: str, timestamp: int) -> None:
         """
-        Function to set system-wise modification date of the file, 
+        Function to set system-wise modification date of the file,
         by doing that, other cloud storages such as Proton Photos, Synology Photos, Nextcloud Photos etc.
         can safely upload the file and sort it in a chronological order
 
@@ -267,7 +269,7 @@ class MetadataRestorer:
 
         return metadata
 
-    def restore_metadata(self) -> bool:
+    def restore(self) -> bool:
         """
         Function to restore metadata
 
