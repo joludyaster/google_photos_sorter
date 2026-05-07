@@ -130,7 +130,7 @@ class ReadFromFolder(ReadFromService):
         try:
             shutil.copy2(file_path, destination_path)
             if self.additional_file_move:
-                additional_path = Path(destination_path / "all-files")
+                additional_path = Path(self.destination_path / "all-files")
                 additional_path.mkdir(parents=True, exist_ok=True)
 
                 additional_file_path = additional_path / file_path.name
