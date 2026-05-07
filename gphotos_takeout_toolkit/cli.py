@@ -5,7 +5,6 @@ from pathlib import Path
 from importlib.metadata import version
 from .core import process_folder, setup_logging, check_exiftool_existence
 
-
 app = typer.Typer(
     name="gphotos_takeout_toolkit",
     help="Sort, merge metadata Google Takeout photos",
@@ -14,7 +13,15 @@ app = typer.Typer(
 )
 console = Console()
 
-def version_callback(value: bool):
+def version_callback(value: bool) -> None:
+    """
+    Function to get a version of the library.
+
+    Parameters
+    ----------
+    value : bool
+        Whether a version should be displayed.
+    """
     if value:
         console.print(f"[bold]v{version('gphotos_takeout_toolkit')}[/]")
         raise typer.Exit()
@@ -22,9 +29,16 @@ def version_callback(value: bool):
 @app.callback()
 def main(
     version: bool = typer.Option(None, "--version", "-V", callback=version_callback, is_eager=True, help="Show version and exit.")
-):
-    pass
+) -> None:
+    """
+    A callback that will display a version of the library.
 
+    Parameters
+    ----------
+    version : bool
+        Whether a version should be displayed.
+    """
+    pass
 
 @app.command("organize")
 def organize(
@@ -49,7 +63,6 @@ def organize(
     )
 
     console.print("[bold green]✓ Done![/]")
-
 
 if __name__ == "__main__":
     app()
