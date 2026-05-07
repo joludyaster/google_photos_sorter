@@ -1,24 +1,22 @@
 import logging
-import os
 import sys
 import time
 import exiftool
 
+from logging import Handler
 from pathlib import Path
-from typing import Optional
-from .sorter import Sorter
+from .services.read_from_folder import ReadFromFolder
 
 logger = logging.getLogger(__name__)
 
-
 def setup_logging(enable_verbosity: bool = True) -> None:
     """
+    Function to set up logging.
+
     Parameters
     ----------
     enable_verbosity : bool, default True
-        Whether the logs should be displayed in the console
-
-    Function to set up logging.
+        Whether the logs should be displayed in the console.
     """
 
     Path("logs").mkdir(parents=True, exist_ok=True)
@@ -34,18 +32,20 @@ def setup_logging(enable_verbosity: bool = True) -> None:
 
     stream_handler = logging.StreamHandler(stream=open(sys.stdout.fileno(), mode='w', encoding='utf-8', closefd=False))
 
-    handlers = [
+    handlers: list[Handler] = [
         error_handler,
         warning_handler,
         info_handler,
-        stream_handler if enable_verbosity else None
     ]
+
+    if enable_verbosity:
+        handlers.append(stream_handler)
 
     logging.basicConfig(
         level=logging.DEBUG,
         format="%(asctime)s - %(levelname)s - %(message)s",
         encoding="utf-8",
-        handlers=filter(None, handlers)
+        handlers=handlers
     )
 
 
@@ -87,26 +87,15 @@ def process_folder(input_path: Path, destination_path: Path, owner: str = "user"
 
     old_time = time.time()
 
-    for subdir, dirs, files in os.walk(input_path):
-        logger.info(f"Processing folder -> {subdir}")
-        logger.info(f"Starting to transport files...")
-
-        gphotos_takeout_toolkit = Sorter(
-            origin_path=Path(subdir),
-            destination_path=destination_path,
-            owner_name=owner,
-            files=files,
-            additional_file_move=additional_file_move
-        )
-        gphotos_takeout_toolkit.file_mover()
-        logger.info(f"Finished working with {subdir}")
+    gphotos_takeout_toolkit = ReadFromFolder(input_path, destination_path, owner, additional_file_move)
+    gphotos_takeout_toolkit.process()
 
     time_difference = time.time() - old_time
     logger.info("Program finished transporting all of the files.")
     logger.info(f"Program finished its job in {time_difference:.2f}s")
 
 
-def get_path(question: str) -> Optional[Path]:
+def get_path(question: str) -> Path | None:
     """
     Function to process path, origin and destination
 
@@ -117,7 +106,7 @@ def get_path(question: str) -> Optional[Path]:
 
     Returns
     -------
-    Optional[Path]
+    Path or None
         Path or None
     """
 
@@ -128,7 +117,10 @@ def get_path(question: str) -> Optional[Path]:
     return path
 
 
-def main():
+def main() -> None:
+    """
+    Main function that orchestrates everything.
+    """
 
     if not check_exiftool_existence():
         return
@@ -158,8 +150,8 @@ def main():
             owner=owner,
             additional_file_move=additional_file_move
         )
-    except Exception:
-        logger.exception(f"Something went wrong while processing {input_path}")
+    except Exception as e:
+        logger.exception(f"Something went wrong while processing {input_path}: {e}")
 
 
 if __name__ == "__main__":
