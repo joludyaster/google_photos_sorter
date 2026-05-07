@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "gphotos_takeout_toolkit"
-version = "0.3.0"
+version = "0.4.0"
 description = "A library that sorts Google Takeout Photos by their creation date with metadata preserved."
 readme = "README.md"
 license = { text = "MIT" }
@@ -15,11 +15,14 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Environment :: Console",
 ]
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
+    "markdown-it-py==4.1.0",
+    "pip==26.1.1",
     "pyexiftool>=0.5.6",
+    "pyrefly==0.64.0",
     "rich>=15.0.0",
-    "typer>=0.25.0",
+    "typer==0.25.1",
 ]
 
 [project.scripts]
@@ -31,7 +34,7 @@ gphotos_takeout_toolkit = "gphotos_takeout_toolkit.cli:app"
 line-length = 100
 
 # Defines a minimum python version to be used
-target-version = "py311"
+target-version = "py312"
 
 [tool.mypy]
 # Enables all optional safety checks, mostly type safety checks
